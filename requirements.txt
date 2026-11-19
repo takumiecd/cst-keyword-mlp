@@ -1,0 +1,5 @@
+torch>=2.6
+torchaudio>=2.6
+numpy>=1.24
+einops==0.8.1
+torchcst @ git+https://github.com/takumiecd/torchcst.git@1750c5ea6cbefe3d4a7d8f6ba02fd9272df3cf98
