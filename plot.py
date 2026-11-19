@@ -28,19 +28,20 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--run", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--cst-reference", type=Path, help="CST metrics JSON for the reference curve")
     parser.add_argument("--cst-compare", type=Path, help="Metrics JSON for another CST run")
     args = parser.parse_args()
     original = read_run(args.run / "baseline" / "metrics.json")
-    cst = read_run(args.run / "cst" / "metrics.json")
-    runs = [
-        (original, "Original KW-MLP", "#175d95", "-"),
-        (cst, f"CST · Atom LR {cst['learning_rates'][1]:g}", "#ad470c", "--"),
-    ]
+    cst = read_run(args.cst_reference or args.run / "cst" / "metrics.json")
+    runs = [(original, "Original KW-MLP", "#175d95", "-")]
+    candidates = [(cst, "#ad470c", "--")]
     if args.cst_compare:
-        extra = read_run(args.cst_compare)
-        if extra["variant"] != "cst" or extra["atoms_per_projection"] != cst["atoms_per_projection"]:
-            parser.error("The additional run must use the same number of CST Atoms per gate")
-        runs.append((extra, f"CST · Atom LR {extra['learning_rates'][1]:g}", "#147a64", "-."))
+        candidates.append((read_run(args.cst_compare), "#147a64", "-."))
+    for run, color, line in candidates:
+        if run["variant"] != "cst":
+            parser.error("Expected CST metrics for the CST curves")
+        label = f"CST · {run['atoms_per_projection']} Atoms · LR {run['learning_rates'][1]:g}"
+        runs.append((run, label, color, line))
     for run, label, _, _ in runs[1:]:
         for key in ("epochs", "seed", "batch_size", "shared_initial_sha256", "dataset"):
             if original[key] != run[key]:
@@ -77,7 +78,7 @@ def main():
         axis.grid(axis="y", color="#d9e1e7", linewidth=0.75)
         axis.set_axisbelow(True)
         axis.spines[["top", "right"]].set_visible(False)
-    loss.legend(frameon=False, title=f"CST uses {cst['atoms_per_projection']} Atoms per gate")
+    loss.legend(frameon=False)
     figure.savefig(args.output, dpi=190, facecolor="white")
 
 
