@@ -159,6 +159,11 @@ def train(model, optimizer, data, args, device, shuffle, augmentation):
             temporary = checkpoint.with_suffix(".tmp")
             torch.save(model.state_dict(), temporary)
             temporary.replace(checkpoint)
+    last = args.output / "last.pt"
+    temporary = last.with_suffix(".tmp")
+    torch.save(model.state_dict(), temporary)
+    temporary.replace(last)
+    last_test = evaluate(model, data, data.test, args.batch_size, device)
     model.load_state_dict(torch.load(checkpoint, map_location="cpu", weights_only=True))
     return {
         "steps_per_epoch": steps,
@@ -166,6 +171,7 @@ def train(model, optimizer, data, args, device, shuffle, augmentation):
         "history": history,
         "best_epoch": best_epoch,
         "test": evaluate(model, data, data.test, args.batch_size, device),
+        "last_test": last_test,
     }
 
 
