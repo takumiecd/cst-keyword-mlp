@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import hashlib
 
+import torch
 from torch import nn
-from torchcst import CSTLinear, ChebyshevSpec, RadiusBounds, chart_presets, init, kernels
+from torchcst import BandwidthBounds, CSTLinear, TriweightSpec, chart_presets, kernels
 
 from upstream.kwmlp import KW_MLP, SpatialGatingUnit
 
@@ -17,17 +18,27 @@ class CSTTemporalProjection(nn.Module):
         # Frame coordinates are in units of the 10 ms feature hop.
         chart = chart_presets.regular_grid(frames, spacing=1.0)
         kernel = kernels.product(
-            kernels.cell_mass(ChebyshevSpec(modes=8)),
+            kernels.l2(TriweightSpec()),
             coordinates=kernels.polar(
                 amplitude_max=1.0,
                 w_c=0.1,
-                bounds=RadiusBounds(
+                bounds=BandwidthBounds(
                     minimum=0.5, birth=3.5, maximum=6.0, upper_floor=0.5
                 ),
             ),
         )
         self.linear = CSTLinear(charts=(chart, chart), atoms=atoms, kernel=kernel, backend=backend)
-        init.variance_scaling_(self.linear, (1e-3 / frames) ** 2 / 3, q=0.25)
+        with torch.no_grad():
+            # Match the small initial gate weights while retaining the Polar radius.
+            target_rms = original.weight.square().mean().sqrt()
+            current_rms = self.linear.operator.weight().square().mean().sqrt()
+            polar = self.linear.atoms.p[:, :2]
+            radius = polar.norm(dim=1)
+            direction = (polar[:, 0] / radius * (target_rms / current_rms)).clamp(
+                -1 + 1e-6, 1 - 1e-6
+            )
+            polar[:, 0] = radius * direction
+            polar[:, 1] = radius * (1 - direction.square()).sqrt()
         self.bias = original.bias
 
     def forward(self, gate):
