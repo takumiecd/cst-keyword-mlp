@@ -50,12 +50,20 @@ done
 # 一から本学習
 for variant in baseline cst; do
   OMP_NUM_THREADS=2 MKL_NUM_THREADS=2 python train.py --variant "$variant" \
-    --cache data/scv2-mfcc --output "output/full-$variant" \
+    --cache data/scv2-mfcc --output "output/full-pair/$variant" \
     --batch-size 256 --seed 17 --atoms 128 --epochs 140
 done
 ```
 
 本学習では学習率を10エポックかけて上げ、コサイン減衰します。基準学習率は通常の
 パラメータが0.001、CSTのAtomが0.0048です。CSTの既定バックエンドは
-`materialized` です。各実行で `metrics.json` が出力され、本学習では検証精度が
-最高だったチェックポイントが `best.pt` に保存されます。
+`materialized` です。各実行で `metrics.json` を出力します。本学習では検証精度が最高に
+達した最初のエポックを `best.pt`、最終エポックを `last.pt` に保存します。メトリクスには
+両チェックポイントのテスト精度と、エポックごとの学習損失・検証結果を記録します。
+`baseline/metrics.json` と `cst/metrics.json` が入ったディレクトリを指定すると、
+以下のコマンドで学習曲線を作成できます。
+
+```bash
+uv run --with matplotlib python plot.py --run output/full-pair \
+  --output output/full-pair/learning-curves.png
+```

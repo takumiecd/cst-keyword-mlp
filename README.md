@@ -57,7 +57,7 @@ done
 # Training from scratch
 for variant in baseline cst; do
   OMP_NUM_THREADS=2 MKL_NUM_THREADS=2 python train.py --variant "$variant" \
-    --cache data/scv2-mfcc --output "output/full-$variant" \
+    --cache data/scv2-mfcc --output "output/full-pair/$variant" \
     --batch-size 256 --seed 17 --atoms 128 --epochs 140
 done
 ```
@@ -65,5 +65,13 @@ done
 The full run uses 10 epochs of learning-rate warmup and cosine decay. Ordinary
 parameters start from a base learning rate of 0.001 and the CST Atom group
 uses 0.0048. The CST backend defaults to `materialized`. Each run writes
-`metrics.json`, and full training also writes the best validation checkpoint
-to `best.pt`.
+`metrics.json`. Full training saves `best.pt` at the first epoch with the
+highest validation accuracy and `last.pt` at the final epoch. The metrics
+record the test scores for both checkpoints and the training loss and
+validation scores for every epoch. To plot the paired curves from a directory
+containing `baseline/metrics.json` and `cst/metrics.json`, run the following.
+
+```bash
+uv run --with matplotlib python plot.py --run output/full-pair \
+  --output output/full-pair/learning-curves.png
+```
