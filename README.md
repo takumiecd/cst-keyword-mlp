@@ -11,6 +11,43 @@ one and matches the small initial weight scale. All other layers use the
 official architecture.
 The vendored model is covered by the [upstream license](upstream/LICENSE).
 
+## Speech Commands V2-35 results
+
+| Model | Atom LR | Seed | Final test accuracy | Test accuracy at the best validation epoch | Epoch first at 95% validation |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Original KW-MLP | — | 17 | 97.35% | 97.19% | 17 |
+| CST, 128 Atoms | 0.0048 | 17 | 95.21% | 95.20% | 104 |
+| CST, 128 Atoms | 0.016 | 17 | 95.27% | 95.24% | 101 |
+| CST, 256 Atoms | 0.016 | 17 | 96.17% | 96.27% | 66 |
+| CST, 512 Atoms | 0.016 | 17 | 96.49% | 96.52% | 39 |
+| Original KW-MLP | — | 29 | 97.48% | 97.28% | 15 |
+| CST, 256 Atoms | 0.016 | 29 | 96.11% | 95.88% | 55 |
+
+Increasing the Atom count improved test accuracy on seed 17. At 512 Atoms per
+gate, the model used 334,139 trainable parameters versus 424,811 for the original
+(21.3% fewer), and its final test accuracy trailed by 0.85 percentage points.
+For the first 512-Atom run, reloading the final checkpoint changed the test
+count by one of 11,005 clips. The table reports the count from the training run.
+
+![Original, 256-Atom and 512-Atom validation curves](results/curves-256-512.png)
+
+[128- and 256-Atom curves](results/curves-128-256.png) · [Seed 29 curves](results/curves-seed29.png) · [Run summary and backend timings](results/summary.json) · [Epoch history](results/history.csv)
+
+## Run inference
+
+Use a 16 kHz mono PCM16 WAV file. The CLI returns the top five of the 35
+Speech Commands labels. The [Hugging Face release](https://huggingface.co/takumiecd/cst-keyword-mlp)
+contains validation-selected checkpoints from matched release reruns of the
+original model and the 512-Atom CST model. The release checkpoint scores are
+recorded in the model configuration.
+
+```bash
+python -m pip install -r requirements.txt
+python infer.py command.wav --variant cst-512
+```
+
+Set `--variant baseline` to compare, or `--device cuda` to use a CUDA build.
+
 ## RTX 4090 pilot
 
 | Model | Median step | Peak allocated VRAM | Peak reserved VRAM | Parameters |
@@ -61,6 +98,10 @@ for variant in baseline cst; do
     --batch-size 256 --seed 17 --atoms 128 --epochs 140
 done
 ```
+
+To use the release configuration, set `--atoms 512 --atom-lr 0.016` in
+the full-training command above, then run
+`python export.py --run output/full-pair --output output/weights`.
 
 The full run uses 10 epochs of learning-rate warmup and cosine decay. Ordinary
 parameters start from a base learning rate of 0.001 and the CST Atom group

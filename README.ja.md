@@ -8,6 +8,42 @@ CSTLinearを使います。元版のカーネルサイズ1の畳み込みは、�
 重み行列を掛けます。CST版もバイアスを1から始め、初期重みのスケールを揃えています。
 他の層は公式アーキテクチャを使います。同梱モデルのライセンスは[こちら](upstream/LICENSE)です。
 
+## Speech Commands V2-35の結果
+
+| モデル | Atom学習率 | シード | 最終テスト精度 | 検証最良時点のテスト精度 | 検証95%に初到達 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 元版 | — | 17 | 97.35% | 97.19% | 17エポック |
+| CST 128 Atom | 0.0048 | 17 | 95.21% | 95.20% | 104エポック |
+| CST 128 Atom | 0.016 | 17 | 95.27% | 95.24% | 101エポック |
+| CST 256 Atom | 0.016 | 17 | 96.17% | 96.27% | 66エポック |
+| CST 512 Atom | 0.016 | 17 | 96.49% | 96.52% | 39エポック |
+| 元版 | — | 29 | 97.48% | 97.28% | 15エポック |
+| CST 256 Atom | 0.016 | 29 | 96.11% | 95.88% | 55エポック |
+
+シード17ではAtomを増やすとテスト精度が改善しました。各ゲート512 Atomでは、
+学習パラメータが元版の424,811から334,139に減り（21.3%減）、最終テスト精度の差は
+0.85ポイントでした。512 Atom版の初回実験では、最終チェックポイントを再読み込みすると
+11,005件中1件だけ正答数が変わりました。表は学習終了時の値です。
+
+![元版・256 Atom版・512 Atom版の学習曲線](results/curves-256-512.png)
+
+[128 Atomと256 Atomの曲線](results/curves-128-256.png) · [シード29の曲線](results/curves-seed29.png) · [集計と実行方式の計測](results/summary.json) · [エポック履歴](results/history.csv)
+
+## 推論
+
+16 kHz・モノラル・PCM16のWAVを入力すると、35種類の音声コマンドのうち確率上位5件を
+返します。[Hugging Face](https://huggingface.co/takumiecd/cst-keyword-mlp)では、
+同条件で再学習した元版と512 Atom版から検証精度で選んだ重みを配布します。
+配布チェックポイントの評価値はモデルの設定ファイルに記録しています。
+
+```bash
+python -m pip install -r requirements.txt
+python infer.py command.wav --variant cst-512
+```
+
+元版との比較は `--variant baseline`、CUDA対応環境でGPUを使う場合は
+`--device cuda` を指定します。
+
 ## RTX 4090での短時間測定
 
 | モデル | 1ステップの中央値 | ピーク割り当てVRAM | ピーク予約VRAM | パラメータ数 |
@@ -54,6 +90,9 @@ for variant in baseline cst; do
     --batch-size 256 --seed 17 --atoms 128 --epochs 140
 done
 ```
+
+公開用の設定で学習するには、上の本学習コマンドを `--atoms 512 --atom-lr 0.016` に変更し、
+`python export.py --run output/full-pair --output output/weights` で重みを書き出します。
 
 本学習では学習率を10エポックかけて上げ、コサイン減衰します。基準学習率は通常の
 パラメータが0.001、CSTのAtomが0.0048です。CSTの既定バックエンドは
